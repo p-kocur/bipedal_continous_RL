@@ -51,7 +51,7 @@ def critic_loss(y, v):
     loss = (y-v)**2
     return loss
 
-def ppo(n_episodes=3000, gamma=0.99, Ne=5, eps=0.2):
+def ppo(n_episodes=12000, gamma=0.99, Ne=4, eps=0.2):
     env = gym.make("BipedalWalker-v3", hardcore=False, render_mode="rgb_array").unwrapped
     actor = NNActor()
     critic = NNCritic()
@@ -64,10 +64,10 @@ def ppo(n_episodes=3000, gamma=0.99, Ne=5, eps=0.2):
             torch.save(actor.state_dict(), "one_body_problem/models/model_ppo.pth")
             play()
             
-        s_t, _ = env.reset(seed=123)
+        s_t, _ = env.reset(seed=123) 
         s_t = torch.tensor(s_t, dtype=torch.float32)
         
-        for _ in range(1000):
+        for j in range(1600):
             distribution = actor(s_t)
             actions = distribution.sample()
             a_log_prob = distribution.log_prob(actions).sum(axis=-1)
@@ -75,6 +75,10 @@ def ppo(n_episodes=3000, gamma=0.99, Ne=5, eps=0.2):
                 
             s_t_1, r, terminated, _, _ = env.step(actions.detach().numpy())
             s_t_1 = torch.tensor(s_t_1, dtype=torch.float32)
+            if j > 1598:
+                r -= 100
+                terminated = True
+                
             
             actor_beta = NNActor()
             
@@ -116,18 +120,20 @@ def ppo(n_episodes=3000, gamma=0.99, Ne=5, eps=0.2):
     
 def play(render="rgb_array"):
     env = gym.make("BipedalWalker-v3", hardcore=False, render_mode=render).unwrapped
-    s_t, _ = env.reset(seed=123)
-    s_t = torch.tensor(s_t, dtype=torch.float32)
-    net = NNActor()
-    net.load_state_dict(torch.load("one_body_problem/models/model_ppo.pth", weights_only=True))
-    terminated = False
     r_sum = 0
-    for _ in range(10000):
-        actions = net(s_t).sample()
-        s_t_1, r, terminated, _, _ = env.step(actions.detach().numpy())
-        r_sum += r
-        if terminated:
-            break
-        s_t = torch.tensor(s_t_1, dtype=torch.float32)
-    print(r_sum)
+    for _ in range(10):
+        s_t, _ = env.reset(seed=123)
+        s_t = torch.tensor(s_t, dtype=torch.float32)
+        net = NNActor()
+        net.load_state_dict(torch.load("one_body_problem/models/model_ppo.pth", weights_only=True))
+        terminated = False
+        
+        for _ in range(2000):
+            actions = net(s_t).sample()
+            s_t_1, r, terminated, _, _ = env.step(actions.detach().numpy())
+            r_sum += r
+            if terminated:
+                break
+            s_t = torch.tensor(s_t_1, dtype=torch.float32)
+    print(r_sum/10)
 
